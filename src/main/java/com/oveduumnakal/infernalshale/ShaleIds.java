@@ -27,6 +27,7 @@ package com.oveduumnakal.infernalshale;
 import java.util.Set;
 
 import net.runelite.api.gameval.ItemID;
+import net.runelite.api.gameval.ObjectID;
 
 /** The item, object and menu text the plugin recognises. */
 final class ShaleIds
@@ -40,11 +41,8 @@ final class ShaleIds
 	/** The chisel and the jeweller's chisel, either of which crushes shale. */
 	static final Set<Integer> CHISELS = Set.of(ItemID.CHISEL, ItemID.JEWELLERS_CHISEL);
 
-	/**
-	 * The two visual variants of a live shale rock (crimson lovakite one and two). This RuneLite version has no named
-	 * constants for them, so the object ids are written out.
-	 */
-	static final Set<Integer> ROCKS = Set.of(56359, 56360);
+	/** The two visual variants of a live shale rock; a mined rock is replaced by a different object. */
+	static final Set<Integer> ROCKS = Set.of(ObjectID.CRIMSON_LOVAKITE1, ObjectID.CRIMSON_LOVAKITE2);
 
 	/** The menu option on the cloth that starts a cycle. */
 	static final String WIPE_OPTION = "Wipe";
