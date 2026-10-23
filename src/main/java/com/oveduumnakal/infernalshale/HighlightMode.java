@@ -25,7 +25,7 @@
 package com.oveduumnakal.infernalshale;
 
 /** How a highlight is drawn. */
-enum HighlightMode
+public enum HighlightMode
 {
 	/** Only the edge. */
 	OUTLINE("Outline"),
