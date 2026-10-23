@@ -27,6 +27,8 @@ package com.oveduumnakal.infernalshale;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /** Tests {@link WipeCycle}: the ready, move, mine rhythm and how a wipe click starts or restarts it. */
 public class WipeCycleTest
@@ -115,5 +117,80 @@ public class WipeCycleTest
 		assertEquals(WipePhase.MOVE, cycle.onTick());
 		assertEquals(WipePhase.MINE, cycle.onTick());
 		assertEquals(WipePhase.READY, cycle.onTick());
+	}
+
+	@Test
+	public void aStandTileClickDuringMoveTakesTheStep()
+	{
+		WipeCycle cycle = new WipeCycle();
+		cycle.onWipeClicked();
+		cycle.onTick();
+		cycle.onWalkClicked(true);
+
+		assertEquals(WipePhase.MINE, cycle.onTick());
+		assertTrue(cycle.stepTaken());
+	}
+
+	@Test
+	public void noGroundClickTakesNoStep()
+	{
+		WipeCycle cycle = new WipeCycle();
+		cycle.onWipeClicked();
+		cycle.onTick();
+		cycle.onTick();
+
+		assertFalse(cycle.stepTaken());
+	}
+
+	@Test
+	public void theLastGroundClickWins()
+	{
+		WipeCycle cycle = new WipeCycle();
+		cycle.onWipeClicked();
+		cycle.onTick();
+		cycle.onWalkClicked(true);
+		cycle.onWalkClicked(false);
+		cycle.onTick();
+
+		assertFalse(cycle.stepTaken());
+	}
+
+	@Test
+	public void groundClicksOutsideMoveAreIgnored()
+	{
+		WipeCycle cycle = new WipeCycle();
+		cycle.onWalkClicked(true);
+		cycle.onWipeClicked();
+		cycle.onTick();
+		cycle.onTick();
+		cycle.onWalkClicked(true);
+
+		assertFalse(cycle.stepTaken());
+	}
+
+	@Test
+	public void aNewWipeForgetsTheLastStep()
+	{
+		WipeCycle cycle = new WipeCycle();
+		cycle.onWipeClicked();
+		cycle.onTick();
+		cycle.onWalkClicked(true);
+		cycle.onTick();
+		cycle.onWipeClicked();
+		cycle.onTick();
+
+		assertFalse(cycle.stepTaken());
+	}
+
+	@Test
+	public void resetForgetsTheStep()
+	{
+		WipeCycle cycle = new WipeCycle();
+		cycle.onWipeClicked();
+		cycle.onTick();
+		cycle.onWalkClicked(true);
+		cycle.reset();
+
+		assertFalse(cycle.stepTaken());
 	}
 }

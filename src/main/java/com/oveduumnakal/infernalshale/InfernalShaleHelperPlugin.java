@@ -34,6 +34,7 @@ import net.runelite.api.CollisionDataFlag;
 import net.runelite.api.GameObject;
 import net.runelite.api.GameState;
 import net.runelite.api.ItemContainer;
+import net.runelite.api.MenuAction;
 import net.runelite.api.Player;
 import net.runelite.api.Scene;
 import net.runelite.api.Tile;
@@ -118,7 +119,10 @@ public class InfernalShaleHelperPlugin extends Plugin
 		state.reset();
 	}
 
-	/** Reads the backpack, decides whether to crush, and otherwise moves the wipe cycle on by one tick. */
+	/**
+	 * Reads the backpack, decides whether to crush, and otherwise moves the wipe cycle on by one tick. The rock is
+	 * only kept as a target for the mine tick when the player clicked the stand tile on the move tick.
+	 */
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
@@ -140,16 +144,25 @@ public class InfernalShaleHelperPlugin extends Plugin
 		WipePhase phase = cycle.onTick();
 		if (phase == WipePhase.MOVE)
 			state.setTarget(pickTarget());
-		else if (phase == WipePhase.READY)
+		else if (phase == WipePhase.READY || (phase == WipePhase.MINE && !cycle.stepTaken()))
 			state.setTarget(null);
 
 		state.activate(phase);
 	}
 
-	/** Starts a cycle when the cloth is wiped, unless the backpack is full enough to crush. */
+	/**
+	 * Notes whether a ground click lands on the stand tile, and starts a cycle when the cloth is wiped, unless the
+	 * backpack is full enough to crush.
+	 */
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
+		if (event.getMenuAction() == MenuAction.WALK)
+		{
+			cycle.onWalkClicked(clickedStandTile());
+			return;
+		}
+
 		if (crushGate.isCrushing() || event.getItemId() != ShaleIds.WET_CLOTH)
 			return;
 
@@ -194,6 +207,15 @@ public class InfernalShaleHelperPlugin extends Plugin
 	{
 		cycle.reset();
 		state.deactivate();
+	}
+
+	/** Whether the ground tile under the mouse is the stand tile the helper is pointing at. */
+	private boolean clickedStandTile()
+	{
+		WorldView view = client.getTopLevelWorldView();
+		Tile tile = view == null ? null : view.getSelectedSceneTile();
+		ShaleTarget target = state.target();
+		return tile != null && target != null && tile.getWorldLocation().equals(target.getStand());
 	}
 
 	/** Picks the rock and stand tile nearest the player, or null when there is none. */
