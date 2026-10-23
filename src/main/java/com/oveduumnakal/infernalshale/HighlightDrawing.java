@@ -29,6 +29,8 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Shape;
 
+import net.runelite.api.Point;
+
 /** Draws a highlight in the chosen style. Shared by the scene and inventory overlays. */
 final class HighlightDrawing
 {
@@ -85,5 +87,25 @@ final class HighlightDrawing
 		graphics.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(),
 			color.getAlpha() / FILL_ALPHA_DIVISOR));
 		graphics.fill(shape);
+	}
+
+	/**
+	 * Writes text in a color over a thin dark shadow, so it stays readable over the scene. Draws nothing for a
+	 * missing location.
+	 *
+	 * @param graphics the graphics to draw on, with its font already set
+	 * @param text     the text
+	 * @param location where the text's baseline starts, or {@code null}
+	 * @param color    the text color
+	 */
+	static void text(Graphics2D graphics, String text, Point location, Color color)
+	{
+		if (location == null)
+			return;
+
+		graphics.setColor(Color.BLACK);
+		graphics.drawString(text, location.getX() + 1, location.getY() + 1);
+		graphics.setColor(color);
+		graphics.drawString(text, location.getX(), location.getY());
 	}
 }

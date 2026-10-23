@@ -40,6 +40,9 @@ final class WipeCycle
 	/** Whether a wipe was clicked since the last tick. */
 	private boolean wipePending;
 
+	/** Whether the last ground click during move was on the stand tile. */
+	private boolean stepTaken;
+
 	@Inject
 	WipeCycle()
 	{
@@ -49,6 +52,38 @@ final class WipeCycle
 	void onWipeClicked()
 	{
 		wipePending = true;
+	}
+
+	/**
+	 * Whether the cloth was wiped since the last tick, so the next tick starts a cycle.
+	 *
+	 * @return true while a wipe waits for the next tick
+	 */
+	boolean wipePending()
+	{
+		return wipePending;
+	}
+
+	/**
+	 * Records a ground click. Only clicks during move count, and the last one wins, since the game walks to the
+	 * last tile clicked.
+	 *
+	 * @param onStandTile whether the click was on the highlighted stand tile
+	 */
+	void onWalkClicked(boolean onStandTile)
+	{
+		if (phase == WipePhase.MOVE)
+			stepTaken = onStandTile;
+	}
+
+	/**
+	 * Whether the player's last ground click during move was on the stand tile, so the rock is worth clicking.
+	 *
+	 * @return true when the step to the stand tile was taken
+	 */
+	boolean stepTaken()
+	{
+		return stepTaken;
 	}
 
 	/**
@@ -63,6 +98,7 @@ final class WipeCycle
 		if (wipePending)
 		{
 			wipePending = false;
+			stepTaken = false;
 			phase = WipePhase.MOVE;
 		}
 		else if (phase == WipePhase.MOVE)
@@ -87,10 +123,11 @@ final class WipeCycle
 		return phase;
 	}
 
-	/** Returns to ready and forgets any pending wipe. */
+	/** Returns to ready and forgets any pending wipe and step. */
 	void reset()
 	{
 		phase = WipePhase.READY;
 		wipePending = false;
+		stepTaken = false;
 	}
 }

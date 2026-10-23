@@ -34,8 +34,10 @@ import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.GameObject;
 import net.runelite.api.Perspective;
+import net.runelite.api.Point;
 import net.runelite.api.WorldView;
 import net.runelite.api.coords.LocalPoint;
+import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -47,14 +49,17 @@ class ShaleSceneOverlay extends Overlay
 	private final InfernalShaleHelperConfig config;
 	private final ShaleState state;
 	private final RockTracker rocks;
+	private final TickClock tickClock;
 
 	@Inject
-	ShaleSceneOverlay(Client client, InfernalShaleHelperConfig config, ShaleState state, RockTracker rocks)
+	ShaleSceneOverlay(Client client, InfernalShaleHelperConfig config, ShaleState state, RockTracker rocks,
+		TickClock tickClock)
 	{
 		this.client = client;
 		this.config = config;
 		this.state = state;
 		this.rocks = rocks;
+		this.tickClock = tickClock;
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_SCENE);
 	}
@@ -66,6 +71,7 @@ class ShaleSceneOverlay extends Overlay
 		if (!state.isActive() || state.isCrushing() || target == null)
 			return null;
 
+		graphics.setFont(FontManager.getRunescapeBoldFont());
 		if (state.phase() == WipePhase.MOVE)
 			drawTile(graphics, target);
 		else if (state.phase() == WipePhase.MINE)
@@ -74,7 +80,7 @@ class ShaleSceneOverlay extends Overlay
 		return null;
 	}
 
-	/** Outlines the tile to stand on. */
+	/** Outlines the tile to stand on, with the tick countdown on it. */
 	private void drawTile(Graphics2D graphics, ShaleTarget target)
 	{
 		WorldView view = client.getTopLevelWorldView();
@@ -85,9 +91,16 @@ class ShaleSceneOverlay extends Overlay
 		Polygon tile = Perspective.getCanvasTilePoly(client, local);
 		if (tile != null)
 			HighlightDrawing.draw(graphics, tile, config.tileColor(), config.highlightMode());
+
+		if (!config.showCountdown())
+			return;
+
+		String text = tickClock.countdown();
+		Point location = Perspective.getCanvasTextLocation(client, graphics, local, text, 0);
+		HighlightDrawing.text(graphics, text, location, config.tileColor());
 	}
 
-	/** Outlines the locked rock, or nothing when it has despawned. */
+	/** Outlines the locked rock with the tick countdown on it, or nothing when it has despawned. */
 	private void drawRock(Graphics2D graphics, ShaleTarget target)
 	{
 		GameObject rock = rocks.get(target.getRock());
@@ -98,5 +111,11 @@ class ShaleSceneOverlay extends Overlay
 		Shape shape = rock.getClickbox() != null ? rock.getClickbox() : rock.getConvexHull();
 		if (shape != null)
 			HighlightDrawing.draw(graphics, shape, color, config.highlightMode());
+
+		if (!config.showCountdown())
+			return;
+
+		String text = tickClock.countdown();
+		HighlightDrawing.text(graphics, text, rock.getCanvasTextLocation(graphics, text, 0), color);
 	}
 }

@@ -25,48 +25,87 @@
 package com.oveduumnakal.infernalshale;
 
 import java.awt.Color;
+import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import javax.inject.Inject;
 
+import net.runelite.api.Point;
 import net.runelite.api.widgets.WidgetItem;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.WidgetItemOverlay;
 
-/** Highlights the wet cloth when it is time to wipe, and the chisel when it is time to crush. */
+/**
+ * Highlights the wet cloth when it is time to wipe, and the chisel when it is time to crush. After a wipe click, the
+ * cloth shows the time left until the tick that lights the stand tile.
+ */
 class InventoryHighlightOverlay extends WidgetItemOverlay
 {
 	private final InfernalShaleHelperConfig config;
 	private final ShaleState state;
 	private final ItemManager itemManager;
+	private final WipeCycle cycle;
+	private final TickClock tickClock;
 
 	@Inject
-	InventoryHighlightOverlay(InfernalShaleHelperConfig config, ShaleState state, ItemManager itemManager)
+	InventoryHighlightOverlay(InfernalShaleHelperConfig config, ShaleState state, ItemManager itemManager,
+		WipeCycle cycle, TickClock tickClock)
 	{
 		this.config = config;
 		this.state = state;
 		this.itemManager = itemManager;
+		this.cycle = cycle;
+		this.tickClock = tickClock;
 		showOnInventory();
 	}
 
 	@Override
 	public void renderItemOverlay(Graphics2D graphics, int itemId, WidgetItem widgetItem)
 	{
-		Color color = colorFor(itemId);
-		if (color == null)
-			return;
-
 		Rectangle bounds = widgetItem.getCanvasBounds();
+		Color color = colorFor(itemId);
+		if (color != null)
+			highlight(graphics, itemId, widgetItem.getQuantity(), bounds, color);
+
+		if (showsCountdown(itemId))
+			drawCountdown(graphics, bounds);
+	}
+
+	/** Draws an item's highlight in the chosen style. */
+	private void highlight(Graphics2D graphics, int itemId, int quantity, Rectangle bounds, Color color)
+	{
 		HighlightMode mode = config.highlightMode();
 		if (mode != HighlightMode.FILL)
 		{
-			BufferedImage outline = itemManager.getItemOutline(itemId, widgetItem.getQuantity(), color);
+			BufferedImage outline = itemManager.getItemOutline(itemId, quantity, color);
 			graphics.drawImage(outline, bounds.x, bounds.y, null);
 		}
 
 		if (mode != HighlightMode.OUTLINE)
 			HighlightDrawing.fill(graphics, bounds, color);
+	}
+
+	/** Whether an item is the cloth, wiped since the last tick, so it shows the countdown. */
+	private boolean showsCountdown(int itemId)
+	{
+		return config.showCountdown()
+			&& itemId == ShaleIds.WET_CLOTH
+			&& state.isActive()
+			&& !state.isCrushing()
+			&& cycle.wipePending();
+	}
+
+	/** Writes the tick countdown centred on an inventory slot. */
+	private void drawCountdown(Graphics2D graphics, Rectangle bounds)
+	{
+		graphics.setFont(FontManager.getRunescapeBoldFont());
+		String text = tickClock.countdown();
+		FontMetrics metrics = graphics.getFontMetrics();
+		int x = bounds.x + (bounds.width - metrics.stringWidth(text)) / 2;
+		int y = bounds.y + (bounds.height + metrics.getAscent() - metrics.getDescent()) / 2;
+		HighlightDrawing.text(graphics, text, new Point(x, y), config.clothColor());
 	}
 
 	/** The color to highlight an item in, or null when it is not highlighted now. */
