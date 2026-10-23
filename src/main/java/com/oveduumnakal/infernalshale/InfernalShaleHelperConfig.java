@@ -24,13 +24,89 @@
  */
 package com.oveduumnakal.infernalshale;
 
+import java.awt.Color;
+
+import net.runelite.client.config.Alpha;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
+import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.Range;
 
-/** Settings for Infernal Shale Helper; items are added as each feature lands. */
+/** Settings for Infernal Shale Helper. */
 @ConfigGroup(InfernalShaleHelperConfig.GROUP)
 public interface InfernalShaleHelperConfig extends Config
 {
 	/** Config group key, shared with the plugin so both agree on where settings are stored. */
 	String GROUP = "infernalshalehelper";
+
+	@Alpha
+	@ConfigItem(
+		keyName = "clothColor",
+		name = "Cloth",
+		description = "Color of the wet cloth when it is time to wipe.",
+		position = 0
+	)
+	default Color clothColor()
+	{
+		return Color.YELLOW;
+	}
+
+	@Alpha
+	@ConfigItem(
+		keyName = "tileColor",
+		name = "Stand tile",
+		description = "Color of the tile to stand on after wiping.",
+		position = 1
+	)
+	default Color tileColor()
+	{
+		return Color.CYAN;
+	}
+
+	@Alpha
+	@ConfigItem(
+		keyName = "rockColor",
+		name = "Rock",
+		description = "Color of the rock to mine.",
+		position = 2
+	)
+	default Color rockColor()
+	{
+		return Color.GREEN;
+	}
+
+	@Alpha
+	@ConfigItem(
+		keyName = "chiselColor",
+		name = "Chisel",
+		description = "Color of the chisel when it is time to crush.",
+		position = 3
+	)
+	default Color chiselColor()
+	{
+		return Color.ORANGE;
+	}
+
+	@ConfigItem(
+		keyName = "highlightMode",
+		name = "Highlight style",
+		description = "Whether highlights are drawn as an outline, a fill or both.",
+		position = 4
+	)
+	default HighlightMode highlightMode()
+	{
+		return HighlightMode.OUTLINE;
+	}
+
+	@Range(min = 1, max = 27)
+	@ConfigItem(
+		keyName = "crushAt",
+		name = "Crush at",
+		description = "Infernal shale count that switches the highlight from the cloth to the chisel.",
+		position = 5
+	)
+	default int crushAt()
+	{
+		return 9;
+	}
 }
