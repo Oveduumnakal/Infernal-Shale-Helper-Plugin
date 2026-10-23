@@ -28,9 +28,31 @@ import javax.inject.Inject;
 
 import com.google.inject.Provides;
 
+import net.runelite.api.Client;
+import net.runelite.api.CollisionData;
+import net.runelite.api.CollisionDataFlag;
+import net.runelite.api.GameObject;
+import net.runelite.api.GameState;
+import net.runelite.api.ItemContainer;
+import net.runelite.api.Player;
+import net.runelite.api.Scene;
+import net.runelite.api.Tile;
+import net.runelite.api.WorldView;
+import net.runelite.api.coords.LocalPoint;
+import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.GameObjectDespawned;
+import net.runelite.api.events.GameObjectSpawned;
+import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
+import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.gameval.InventoryID;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.Text;
 
 /** Entry point: highlights each step of the wet-cloth tick rhythm for mining infernal shale. */
 @PluginDescriptor(
@@ -41,12 +63,199 @@ import net.runelite.client.plugins.PluginDescriptor;
 )
 public class InfernalShaleHelperPlugin extends Plugin
 {
+	/** Every collision flag that stops a player standing on a tile. */
+	private static final int BLOCKED = CollisionDataFlag.BLOCK_MOVEMENT_FULL
+		| CollisionDataFlag.BLOCK_MOVEMENT_OBJECT
+		| CollisionDataFlag.BLOCK_MOVEMENT_FLOOR
+		| CollisionDataFlag.BLOCK_MOVEMENT_FLOOR_DECORATION;
+
+	@Inject
+	private Client client;
+
+	@Inject
+	private ClientThread clientThread;
+
 	@Inject
 	private InfernalShaleHelperConfig config;
+
+	@Inject
+	private OverlayManager overlayManager;
+
+	@Inject
+	private WipeCycle cycle;
+
+	@Inject
+	private RockTracker rockTracker;
+
+	@Inject
+	private CrushGate crushGate;
+
+	@Inject
+	private ShaleState state;
+
+	@Inject
+	private InventoryHighlightOverlay inventoryOverlay;
+
+	@Inject
+	private ShaleSceneOverlay sceneOverlay;
+
+	@Override
+	protected void startUp()
+	{
+		overlayManager.add(inventoryOverlay);
+		overlayManager.add(sceneOverlay);
+		clientThread.invokeLater(this::restoreScene);
+	}
+
+	@Override
+	protected void shutDown()
+	{
+		overlayManager.remove(inventoryOverlay);
+		overlayManager.remove(sceneOverlay);
+		rockTracker.clear();
+		cycle.reset();
+		crushGate.reset();
+		state.reset();
+	}
+
+	/** Reads the backpack, decides whether to crush, and otherwise moves the wipe cycle on by one tick. */
+	@Subscribe
+	public void onGameTick(GameTick event)
+	{
+		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
+		if (inventory == null)
+		{
+			stopCycle();
+			return;
+		}
+
+		boolean crushing = crushGate.update(inventory.count(ShaleIds.INFERNAL_SHALE), config.crushAt());
+		state.setCrushing(crushing);
+		if (crushing || !inventory.contains(ShaleIds.WET_CLOTH) || rockTracker.isEmpty())
+		{
+			stopCycle();
+			return;
+		}
+
+		WipePhase phase = cycle.onTick();
+		if (phase == WipePhase.MOVE)
+			state.setTarget(pickTarget());
+		else if (phase == WipePhase.READY)
+			state.setTarget(null);
+
+		state.activate(phase);
+	}
+
+	/** Starts a cycle when the cloth is wiped, unless the backpack is full enough to crush. */
+	@Subscribe
+	public void onMenuOptionClicked(MenuOptionClicked event)
+	{
+		if (crushGate.isCrushing() || event.getItemId() != ShaleIds.WET_CLOTH)
+			return;
+
+		if (Text.removeTags(event.getMenuOption()).equalsIgnoreCase(ShaleIds.WIPE_OPTION))
+			cycle.onWipeClicked();
+	}
+
+	/** Forgets the rocks and the cycle when the scene unloads or the player leaves the world. */
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event)
+	{
+		GameState gameState = event.getGameState();
+		if (gameState == GameState.LOADING || gameState == GameState.LOGIN_SCREEN || gameState == GameState.HOPPING)
+		{
+			rockTracker.clear();
+			stopCycle();
+		}
+	}
+
+	/** Records a rock that appeared. */
+	@Subscribe
+	public void onGameObjectSpawned(GameObjectSpawned event)
+	{
+		rockTracker.onSpawned(event.getGameObject());
+	}
+
+	/** Forgets a rock that left the scene. */
+	@Subscribe
+	public void onGameObjectDespawned(GameObjectDespawned event)
+	{
+		rockTracker.onDespawned(event.getGameObject());
+	}
 
 	@Provides
 	InfernalShaleHelperConfig provideConfig(ConfigManager configManager)
 	{
 		return configManager.getConfig(InfernalShaleHelperConfig.class);
+	}
+
+	/** Returns the cycle to ready and clears the target, for when the helper has nothing to point at. */
+	private void stopCycle()
+	{
+		cycle.reset();
+		state.deactivate();
+	}
+
+	/** Picks the rock and stand tile nearest the player, or null when there is none. */
+	private ShaleTarget pickTarget()
+	{
+		Player player = client.getLocalPlayer();
+		if (player == null)
+			return null;
+
+		return TargetPicker.pick(player.getWorldLocation(), rockTracker.tiles(), this::isWalkable).orElse(null);
+	}
+
+	/** Whether a tile is in the scene and nothing on it blocks standing there. */
+	private boolean isWalkable(WorldPoint point)
+	{
+		WorldView view = client.getTopLevelWorldView();
+		LocalPoint local = view == null ? null : LocalPoint.fromWorld(view, point);
+		CollisionData[] maps = view == null ? null : view.getCollisionMaps();
+		if (local == null || maps == null || point.getPlane() >= maps.length || maps[point.getPlane()] == null)
+			return false;
+
+		int flags = maps[point.getPlane()].getFlags()[local.getSceneX()][local.getSceneY()];
+		return (flags & BLOCKED) == 0;
+	}
+
+	/** Feeds the rocks already in the scene to the tracker, for when the plugin starts after login. */
+	private void restoreScene()
+	{
+		WorldView view = client.getTopLevelWorldView();
+		if (client.getGameState() != GameState.LOGGED_IN || view == null)
+			return;
+
+		Scene scene = view.getScene();
+		if (scene == null)
+			return;
+
+		for (Tile[][] plane : scene.getTiles())
+		{
+			if (plane == null)
+				continue;
+
+			for (Tile[] column : plane)
+				trackColumn(column);
+		}
+	}
+
+	/** Feeds the rocks on a column of scene tiles to the tracker. */
+	private void trackColumn(Tile[] column)
+	{
+		if (column == null)
+			return;
+
+		for (Tile tile : column)
+		{
+			if (tile == null)
+				continue;
+
+			for (GameObject object : tile.getGameObjects())
+			{
+				if (object != null)
+					rockTracker.onSpawned(object);
+			}
+		}
 	}
 }
