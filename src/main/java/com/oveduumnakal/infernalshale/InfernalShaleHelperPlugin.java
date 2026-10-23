@@ -95,6 +95,9 @@ public class InfernalShaleHelperPlugin extends Plugin
 	private ShaleState state;
 
 	@Inject
+	private TickClock tickClock;
+
+	@Inject
 	private InventoryHighlightOverlay inventoryOverlay;
 
 	@Inject
@@ -126,6 +129,7 @@ public class InfernalShaleHelperPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
+		tickClock.onTick();
 		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
 		if (inventory == null)
 		{
