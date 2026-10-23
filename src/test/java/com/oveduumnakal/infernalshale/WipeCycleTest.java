@@ -193,4 +193,17 @@ public class WipeCycleTest
 
 		assertFalse(cycle.stepTaken());
 	}
+
+	@Test
+	public void aWipeIsPendingUntilTheNextTick()
+	{
+		WipeCycle cycle = new WipeCycle();
+		assertFalse(cycle.wipePending());
+
+		cycle.onWipeClicked();
+		assertTrue(cycle.wipePending());
+
+		cycle.onTick();
+		assertFalse(cycle.wipePending());
+	}
 }

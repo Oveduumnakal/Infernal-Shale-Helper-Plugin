@@ -113,7 +113,7 @@ public interface InfernalShaleHelperConfig extends Config
 	@ConfigItem(
 		keyName = "showCountdown",
 		name = "Tick countdown",
-		description = "Show the time left in the tick on the tile and the rock, counting down from 0.60.",
+		description = "Show the time left in the tick on the wiped cloth, the tile and the rock, from 0.60 down.",
 		position = 6
 	)
 	default boolean showCountdown()

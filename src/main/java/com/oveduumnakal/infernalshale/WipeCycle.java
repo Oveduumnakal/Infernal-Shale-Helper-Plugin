@@ -55,6 +55,16 @@ final class WipeCycle
 	}
 
 	/**
+	 * Whether the cloth was wiped since the last tick, so the next tick starts a cycle.
+	 *
+	 * @return true while a wipe waits for the next tick
+	 */
+	boolean wipePending()
+	{
+		return wipePending;
+	}
+
+	/**
 	 * Records a ground click. Only clicks during move count, and the last one wins, since the game walks to the
 	 * last tile clicked.
 	 *
